@@ -98,6 +98,8 @@ def create_name():
     print("生成的名字列表:", response_str)
 
 
+
+
 #数据预处理
 def processes_data(data):
     text = " ".join([doc.page_content for doc in data])
