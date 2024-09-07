@@ -3,9 +3,9 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import BaseOutputParser
 import json
 from langchain_community.llms import Ollama
-from baiduqianfan.prompt import PromptTempalte
-from baiduqianfan.selector import Selector_template
-from baiduqianfan.loader import LoaderTemplate
+from FTARiver.baiduqianfan.prompt import PromptTempalte
+from FTARiver.baiduqianfan.selector import Selector_template
+from FTARiver.baiduqianfan.loader import LoaderTemplate
 # def get_access_token():
 #     url = "https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=q9IGmb6ZjDxbQjyGvXtwRBYn&client_secret=35EQhSIKW5nS1f02VVGsk0LZKGGFdt6r"
 #     payload = json.dumps("")
