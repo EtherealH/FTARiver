@@ -1,4 +1,3 @@
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_text_splitters import CharacterTextSplitter
 from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
@@ -65,6 +64,7 @@ class TransformerTemplate:
         with open(token_data) as f:
             frgment = f.read()
         text_spliter = CharacterTextSplitter.from_tiktoken_encoder(
+            encoding_name="gpt-3.5-turbo", #指定 tiktoken 编码器
             chunk_size=4000,  # 切割文本块大小，一般通过长度函数计算
             chunk_overlap=30,  # 切分的文本块重叠大小，一般通过长度函数计算
         )
