@@ -10,7 +10,11 @@ from FTARiver.baiduqianfan.selector import Selector_template
 from FTARiver.baiduqianfan.loader import LoaderTemplate
 from FTARiver.baiduqianfan.longcontext import deal_context_template
 from FTARiver.baiduqianfan.test.statictextLoder import StaticLoader
-from langchain_core.runnables import RunnableSequence, RunnableLambda, RunnableMap
+from FTARiver.baiduqianfan.embedDocment import chat_doc_template
+
+# 经济学文档
+doc = "knowledge/plain_text_economic.docx"
+chat_yl = chat_doc_template(doc)
 
 
 def get_baidu_api_url():
@@ -25,23 +29,24 @@ class SeparatedListOutput(BaseOutputParser):
 
 
 # 自定义大模型连接方式
-def llm(prompt):
+def llm(msgs):
     api_url = get_baidu_api_url()
     headers = {
         'Content-Type': 'application/json'
     }
 
+    # 构建可序列化的消息列表
+    messages = [{"role": msg.type, "content": msg.content} for msg in msgs]
+
     data = json.dumps({
         "model": "llama3",
         "options": {
-            "temperature": 0.  # 为0表示不让模型自由发挥，输出结果相对较固定，>0的话，输出的结果会比较放飞自我
+            "temperature": 0.  # 控制生成的内容
         },
         "stream": False,
-        "messages": [{
-            "role": "user",
-            "content": prompt
-        }]  # 对话列表
+        "messages": messages  # 使用构建的消息列表
     })
+
     response = requests.request("POST", api_url, headers=headers, data=data)
 
     return response.text
@@ -141,7 +146,6 @@ def extract_page_content(docs):
         raise TypeError("输入的内容不是 Document 或其列表")
 
 
-
 # 函数式封装
 def llm_runnable(prompt):
     llm = LocalLLM()
@@ -149,25 +153,6 @@ def llm_runnable(prompt):
 
 
 def economic_plugin():
-    stuff_prompt = """Given this text extracts:
-    ------------------------------
-    {context}
-    ------------------------------
-    Please answer the following questions:
-    {query}
-    """
-
-    prompt_template = PromptTemplate(
-        template=stuff_prompt,
-        input_variables=["context", "query"]
-    )
-
-    # 创建 RunnableSequence
-    runnable_sequence = RunnableSequence(
-        prompt_template,  # 将 PromptTemplate 包装成 RunnableMap
-        llm_runnable  # 使用本地模型
-    )
-
     text = StaticLoader.get_text()
     reo_docs = deal_context_template.start(text)
 
@@ -178,6 +163,18 @@ def economic_plugin():
     parsed_response = output_parser.parse(response)
     response_str = '\n'.join(parsed_response)
     print(response_str)
+
+
+# 和文本机器人聊天
+def chatWithyl(question):
+    _content = ""
+    context = chat_yl.askAndFindFiles(question)
+    for i in context:
+        _content += i.page_content
+    msgs = chat_yl.prompts.format_messages(context=_content, question=question)
+    print(msgs)
+    response = llm(msgs)
+    print(f"answer: {response}")
 
 
 # 数据预处理
@@ -200,4 +197,6 @@ def concat_prompt(knowledge_lib, prompt):
 
 if __name__ == "__main__":
     # create_name()
-    economic_plugin()
+    # economic_plugin()
+    chat_yl.splitSentences()
+    chatWithyl("What is Economics?")
