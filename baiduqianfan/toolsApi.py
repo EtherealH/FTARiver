@@ -4,6 +4,7 @@ from langchain.schema import BaseOutputParser
 import json
 
 from langchain.schema import Document
+from langchain_core.runnables import Runnable
 
 from FTARiver.baiduqianfan.prompt import PromptTempalte
 from FTARiver.baiduqianfan.selector import Selector_template
@@ -11,7 +12,7 @@ from FTARiver.baiduqianfan.loader import LoaderTemplate
 from FTARiver.baiduqianfan.longcontext import deal_context_template
 from FTARiver.baiduqianfan.test.statictextLoder import StaticLoader
 from FTARiver.baiduqianfan.embedDocment import chat_doc_template
-
+from FTARiver.baiduqianfan.Chains import Chains_template
 # 经济学文档
 doc = "knowledge/plain_text_economic.docx"
 chat_yl = chat_doc_template(doc)
@@ -99,28 +100,30 @@ def create_name():
     print("生成的名字列表:", response_str)
 
 
-# 自定义本地 LLM 类，替换 OpenAI 类
-class LocalLLM:
+class LocalLLM(Runnable):
     def __init__(self, api_url="http://localhost:11343/api/chat", model="llama3", temperature=0.7):
         self.api_url = api_url
         self.model = model
         self.temperature = temperature
 
-    def call(self, prompt, max_tokens=100):
+    def invoke(self, input: str, **kwargs) -> str:
         headers = {
             "Content-Type": "application/json"
         }
 
+        # 从 kwargs 中获取 max_tokens，默认 100
+        max_tokens = kwargs.get("max_tokens", 100)
+
         data = {
             "model": self.model,
             "options": {
-                "temperature": self.temperature,  # 控制模型输出的随机性
-                "max_tokens": max_tokens  # 设置生成的最大 token 数量
+                "temperature": self.temperature,
+                "max_tokens": max_tokens
             },
             "stream": False,
             "messages": [{
                 "role": "user",
-                "content": prompt  # 用户输入的 prompt
+                "content": input  # 用户输入的 prompt
             }]
         }
 
@@ -129,7 +132,9 @@ class LocalLLM:
         # 检查响应状态
         if response.status_code == 200:
             result = response.json()
-            return result.get("text", "")  # 假设返回值中有 'text' 字段
+            message = result.get("message","")
+            content = message.get("content")
+            return content
         else:
             raise Exception(f"请求模型服务器失败: {response.status_code} - {response.text}")
 
@@ -149,7 +154,7 @@ def extract_page_content(docs):
 # 函数式封装
 def llm_runnable(prompt):
     llm = LocalLLM()
-    return llm.call(prompt)
+    return llm.invoke(prompt)
 
 
 def economic_plugin():
@@ -194,9 +199,45 @@ def concat_prompt(knowledge_lib, prompt):
 
     return final_prompt
 
+# 运行链的测试
+def use_chain_llm():
+
+
+    #经济学模版
+    economic_template = """
+    You are an economist.\n
+    You are good at answering questions in a simple and understandable way.\n
+    When you don't know the problem, you admit that you don't.\n
+    this is a question at down.\n
+    {input}
+    """
+    economic_prompt = PromptTemplate.from_template(economic_template)
+    # 算命学模版
+    featureTail_template = """
+    You are an Fortune Teller.\n
+    You can give people names based on their date of birth and gender.\n
+    this is a question at down.\n
+    {input}
+    """
+    fortuneTaller_prompt = PromptTemplate.from_template(featureTail_template)
+    #模型
+    llm = LocalLLM(api_url="http://localhost:11343/api/chat", model="llama3")
+    #提示词模版列表
+    prompt_list = [economic_template,featureTail_template]
+    #问题
+    question = "How to define the stock market in economics?"
+    #创建链对象
+    chain = Chains_template(llm,prompt_list,question)
+    #调用函数
+    chain.route_chain()
+
+
+
+
 
 if __name__ == "__main__":
     # create_name()
     # economic_plugin()
-    chat_yl.splitSentences()
-    chatWithyl("What is Economics?")
+    #chat_yl.splitSentences()
+    #chatWithyl("What is Economics?")
+    use_chain_llm()
