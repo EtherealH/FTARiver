@@ -194,8 +194,9 @@ def use_chain_llm():
     #创建链对象
     chain = Chains_template(llm,prompt_list,question)
     #调用函数
-    chain.route_chain()
-
+    #chain.route_chain()
+    answer = chain.douc_process_chain("What is Economics?")
+    print(answer)
 # 专用链测试
 
 def use_special_chains():
@@ -211,6 +212,7 @@ def use_special_chains():
     result = chains.invoke({"topic":"economic"})
     print(result)
 
+# 文档处理链测试
 
 
 if __name__ == "__main__":
@@ -218,5 +220,6 @@ if __name__ == "__main__":
     # economic_plugin()
     #chat_yl.splitSentences()
     #chatWithyl("What is Economics?")
-    #use_chain_llm()
-    use_special_chains()
+    use_chain_llm()
+    #use_special_chains()
+

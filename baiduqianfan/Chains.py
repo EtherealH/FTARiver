@@ -2,16 +2,21 @@
 from langchain.prompts import PromptTemplate
 
 from langchain.chains.router.multi_prompt_prompt import MULTI_PROMPT_ROUTER_TEMPLATE
-from langchain_core.runnables import RunnableLambda
+from langchain_core.prompt_values import StringPromptValue
 
 from langchain_core.runnables.base import RunnableLambda,RunnableMap
 
 from langchain.prompts.base import BasePromptTemplate
 
 from FTARiver.baiduqianfan.LLMUtils import LocalLLM
-
+from langchain.chains import RetrievalQA
+from langchain.chains import LLMChain
+from langchain.vectorstores import Chroma
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders import PyPDFLoader
 from typing import List,Dict,Any,Optional
-from langchain.chains.base import  Chain
+from langchain.chains.base import Chain
+from FTARiver.baiduqianfan.embedDocment import LocalEmbedding
 from langchain.callbacks.manager import (
 CallbackManagerForChainRun
 )
@@ -128,6 +133,58 @@ class Chains_template:
             return "zhouyi"
         else:
             return None  # 或者返回默认链的名称
+
+    # 文档处理链
+    def douc_process_chain(self,question):
+        #加载文档
+        global summary
+        loader = PyPDFLoader("knowledge/economicist2.pdf")
+        doucment = loader.load()
+        #分割文档
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500,chunk_overlap=50)
+        texts = text_splitter.split_documents(doucment)
+
+        #嵌入生成与向量存储
+        embeddings = LocalEmbedding('sentence-transformers/all-MiniLM-L6-v2')
+        vertorstore = Chroma.from_documents(texts, embeddings)
+        #问答链
+        retriever = vertorstore.as_retriever()
+        qa_chain = RetrievalQA.from_chain_type(llm=self.llm, retriever=retriever, return_source_documents=True)
+        #提问
+        query = "Please summarize the contents of this pdf document"
+
+        result = qa_chain({"query":query})
+        #摘要链
+        summary_prompt_template = """
+        You are a professional document analysis assistant. Please summarize the following text:
+        {text}
+        summary:
+        """
+        summary_prompt = PromptTemplate(template=summary_prompt_template,input_variable=["text"])
+        summary_chain = LLMChain(llm = self.llm,prompt=summary_prompt)
+        # 遍历文档分块进行摘要
+        summaries = []
+        for text in texts:
+            prompt_value = summary_prompt.format(text=text.page_content)
+            # 如果 prompt_value 是 StringPromptValue，则转换为字符串
+            if isinstance(prompt_value, StringPromptValue):
+                prompt_text = prompt_value.to_string()
+            else:
+                prompt_text = prompt_value
+            summary = summary_chain.run({"text": prompt_text})
+            summaries.append(summary)
+        final_summary = "\n".join(summaries)
+        #基于生成的摘要回答问题
+        answer_prompt_template = f"""
+        You have the following summarized information about the document:{summary}
+        
+        this about summary content can help you answer this question, answer the following question:{question}
+        Answer:        
+        """
+        answer_prompt = PromptTemplate(template=answer_prompt_template,input_variable=["summary","question"])
+        answer_chain = LLMChain(llm=self.llm,prompt = answer_prompt)
+        final_answer = answer_chain.run({"summary":final_summary,"question":question})
+        return final_answer
 
 
 class Special_Chains_template(Chain):
