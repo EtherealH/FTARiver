@@ -16,8 +16,13 @@ class AgentsTemplate:
         # 记忆组件
         self.memory = ConversationBufferMemory(
             memory_key="chat_history",
+            return_messages=True,
         )
-        self.agentType = [AgentType.ZERO_SHOT_REACT_DESCRIPTION,AgentType.CHAT_ZERO_SHOT_REACT_DESCRIPTION]
+        self.agentType = [AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+                          AgentType.CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+                          AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+                          AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+                          AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION]
 
     #零样本增强式生成ZERO_SHOT_REACT_DESCRIPTION,
     #使用chatModel的零样本增强式生成CHAT_ZERO_SHOT_REACT_DESCRIPTION,
@@ -30,15 +35,22 @@ class AgentsTemplate:
             "llm": self.llm,
             "agent": agentType,
             "verbose": True,
+            "handle_parsing_errors": True
         }
-        if agentType == AgentType.CONVERSATIONAL_REACT_DESCRIPTION:
+        if agentType in [
+            AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+            AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+            AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION
+        ]:
             agent_params["memory"] = self.memory
         #初始化代理
         agent = initialize_agent(**agent_params)
         print("-------------------")
         try:
             response = agent.run(question)
+            print(f"运行的代理类型: {agentType}, 提问内容: {question}")
             print(f"agent回答: {response}")
+            #self.memory.save_context(question,response)
         except Exception as e:
             print(f"代理运行时出错: {e}")
     #使用chatModel的零样本增强式生成

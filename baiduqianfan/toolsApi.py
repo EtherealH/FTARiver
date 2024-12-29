@@ -217,9 +217,13 @@ def use_special_chains():
 def use_agent():
     llm = LocalLLM(api_url="http://localhost:11343/api/chat", model="llama3")
     agent = AgentsTemplate(llm=llm)
-    question = input("请输入您的问题")
-    agent.zero_agent(question,AgentType.ZERO_SHOT_REACT_DESCRIPTION)
-
+    while True:
+        question = input("请输入您的问题: ")
+        #输入exit表示结束对话
+        if question.lower() == "exit":
+            print("对话结束")
+            break
+        agent.zero_agent(question,AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION)
 
 
 if __name__ == "__main__":

@@ -31,8 +31,12 @@ class LocalLLM(Runnable):
 
         if response.status_code == 200:
             result = response.json()
-            content = result.get("message", {}).get("content", "")
-            return content
+            message_content = result.get("message", {}).get("content", "")
+            if message_content:
+                # 可以加入对 message_content 的后处理，例如截取或清理多余的信息
+                return message_content.strip()
+            else:
+                return "未返回有效的内容"
         else:
             raise Exception(f"请求模型服务器失败: {response.status_code} - {response.text}")
 
