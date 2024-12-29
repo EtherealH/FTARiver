@@ -15,6 +15,8 @@ from FTARiver.baiduqianfan.embedDocment import chat_doc_template
 from FTARiver.baiduqianfan.Chains import Chains_template
 from FTARiver.baiduqianfan.Chains import Special_Chains_template
 from FTARiver.baiduqianfan.LLMUtils import LocalLLM
+from FTARiver.baiduqianfan.agents import AgentsTemplate
+from langchain.agents import AgentType
 # 经济学文档
 doc = "knowledge/plain_text_economic.docx"
 chat_yl = chat_doc_template(doc)
@@ -198,7 +200,6 @@ def use_chain_llm():
     answer = chain.douc_process_chain("What is Economics?")
     print(answer)
 # 专用链测试
-
 def use_special_chains():
     llm = LocalLLM(api_url="http://localhost:11343/api/chat", model="llama3")
 
@@ -212,7 +213,13 @@ def use_special_chains():
     result = chains.invoke({"topic":"economic"})
     print(result)
 
-# 文档处理链测试
+# langchain内置agent测试
+def use_agent():
+    llm = LocalLLM(api_url="http://localhost:11343/api/chat", model="llama3")
+    agent = AgentsTemplate(llm=llm)
+    question = input("请输入您的问题")
+    agent.zero_agent(question,AgentType.ZERO_SHOT_REACT_DESCRIPTION)
+
 
 
 if __name__ == "__main__":
@@ -220,6 +227,7 @@ if __name__ == "__main__":
     # economic_plugin()
     #chat_yl.splitSentences()
     #chatWithyl("What is Economics?")
-    use_chain_llm()
+    #use_chain_llm()
     #use_special_chains()
+    use_agent()
 
