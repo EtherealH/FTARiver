@@ -1,18 +1,33 @@
-from langchain_community.vectorstores import Chroma
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.agent_toolkits.load_tools import load_tools
+from langchain.utilities import SerpAPIWrapper
+from langchain.chains import LLMMathChain
 from langchain.agents import initialize_agent, AgentType
 import os
+from langchain.agents import Tool,load_tools
 from langchain.memory import ConversationBufferMemory
-
+from langchain.prompts import  MessagesPlaceholder
 # serppai的token
 os.environ["SERPAPI_API_KEY"] = "95ac0e518f8e578cc81b149144efd7535d5d7ccab87244e946a1cf3bb14ef3e7"
 class AgentsTemplate:
 
     def __init__(self,**kwargs):
+        #构建一个搜索工具
+        search = SerpAPIWrapper()
         self.prompt = kwargs.get("base_prompt")
         self.llm = kwargs.get("llm")
-        self.tools = load_tools(["serpapi","llm-math"],llm=self.llm)
+        llm_math_chain = load_tools(["serpapi", "llm-math"], llm=self.llm)
+        self.tools = [
+            Tool(
+                name="Search",
+                func=search.run,
+                description= "useful for when you need to answer questions about current events or the current state of the world"
+            ),
+            Tool(
+                name="Math Chain",
+                func=llm_math_chain[1].run,
+                description="useful for solving mathematical problems"
+            )
+        ]
+        #load_tools(["serpapi", "llm-math"], llm=self.llm)
         # 记忆组件
         self.memory = ConversationBufferMemory(
             memory_key="chat_history",
@@ -35,17 +50,22 @@ class AgentsTemplate:
             "llm": self.llm,
             "agent": agentType,
             "verbose": True,
+            "memory": self.memory,
+            "agent_kwargs" : {"extra_prompt_messages": [MessagesPlaceholder(variable_name="chat_history"),MessagesPlaceholder(variable_name="agent_scratchpad")],
+                           },
             "handle_parsing_errors": True
         }
-        if agentType in [
-            AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-            AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
-            AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION
-        ]:
-            agent_params["memory"] = self.memory
         #初始化代理
         agent = initialize_agent(**agent_params)
         print("-------------------")
+        # 输出提示词模板
+        prompt = agent.agent.llm_chain.prompt
+        print("Prompt Template:")
+        print(prompt)
+        # print(agent.agent.prompt.messages)
+        # print(agent.agent.prompt.messages[0])
+        # print(agent.agent.prompt.messages[1])
+        # print(agent.agent.prompt.messages[2])
         try:
             response = agent.run(question)
             print(f"运行的代理类型: {agentType}, 提问内容: {question}")
