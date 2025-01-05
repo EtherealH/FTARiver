@@ -1,10 +1,11 @@
 from langchain.utilities import SerpAPIWrapper
-from langchain.chains import LLMMathChain
+from langchain.chains import LLMChain
 from langchain.agents import initialize_agent, AgentType
 import os
 from langchain.agents import Tool,load_tools
-from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferMemory, ReadOnlySharedMemory
 from langchain.prompts import  MessagesPlaceholder
+from langchain.prompts import PromptTemplate,MessagesPlaceholder
 # serppai的token
 os.environ["SERPAPI_API_KEY"] = "95ac0e518f8e578cc81b149144efd7535d5d7ccab87244e946a1cf3bb14ef3e7"
 class AgentsTemplate:
@@ -15,6 +16,27 @@ class AgentsTemplate:
         self.prompt = kwargs.get("base_prompt")
         self.llm = kwargs.get("llm")
         llm_math_chain = load_tools(["serpapi", "llm-math"], llm=self.llm)
+        # 创建一条链总结对话
+        template = """
+        The following is a conversation between an AI robot and a human:{chat_history}
+        Write a conversation summary based on the input and the conversation record above,input:{input}
+        """
+
+        self.memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+        )
+        prompt = PromptTemplate(
+            input_variable=["input", "chat_history"],
+            template=template
+        )
+        self.shared_memory = ReadOnlySharedMemory(memory=self.memory)
+        self.summary_chain = LLMChain(
+            llm=self.llm,
+            prompt = prompt,
+            verbose = True,
+            memory = self.shared_memory
+        )
         self.tools = [
             Tool(
                 name="Search",
@@ -22,28 +44,34 @@ class AgentsTemplate:
                 description= "useful for when you need to answer questions about current events or the current state of the world"
             ),
             Tool(
-                name="Math Chain",
-                func=llm_math_chain[1].run,
-                description="useful for solving mathematical problems"
+                name="Summary",
+                func=self.SummaryChainFun,
+                description="This tool can be used when you are asked to summarize a conversation. The tool input must be a string. Use it only when necessary"
             )
         ]
         #load_tools(["serpapi", "llm-math"], llm=self.llm)
         # 记忆组件
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True,
-        )
+
+
         self.agentType = [AgentType.ZERO_SHOT_REACT_DESCRIPTION,
                           AgentType.CHAT_ZERO_SHOT_REACT_DESCRIPTION,
                           AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
                           AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
                           AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION]
-
+    def SummaryChainFun(self, history):
+        print("\n============== Summary Chain Execution ==============")
+        print("Input History: ", history)
+        return self.summary_chain.run(history)
     #零样本增强式生成ZERO_SHOT_REACT_DESCRIPTION,
     #使用chatModel的零样本增强式生成CHAT_ZERO_SHOT_REACT_DESCRIPTION,
     def zero_agent(self,question,agentType):
         if agentType not in self.agentType:
             raise ValueError("无效的 AgentType，请选择有效的类型！")
+        prefix = """Have a conversation with a human, answering the following questions as best you can. You have access to the following tools:"""
+        suffix = """Begin!"
+        {chat_history}
+        Question: {input}
+        {agent_scratchpad}"""
         # 动态构建初始化参数
         agent_params = {
             "tools": self.tools,
@@ -51,8 +79,14 @@ class AgentsTemplate:
             "agent": agentType,
             "verbose": True,
             "memory": self.memory,
-            "agent_kwargs" : {"extra_prompt_messages": [MessagesPlaceholder(variable_name="chat_history"),MessagesPlaceholder(variable_name="agent_scratchpad")],
-                           },
+            "agent_kwargs" : {
+                "chat_history": MessagesPlaceholder(variable_name="chat_history"),
+                "agent_scratchpad":MessagesPlaceholder(variable_name="agent_scratchpad"),
+                "prefix":prefix,
+                "sufix":suffix,
+                "input":MessagesPlaceholder("input")
+
+            },
             "handle_parsing_errors": True
         }
         #初始化代理
