@@ -4,7 +4,9 @@ from langchain.agents import initialize_agent, AgentType
 import os
 from langchain.agents import Tool,load_tools
 from langchain.memory import ConversationBufferMemory, ReadOnlySharedMemory
-from langchain.prompts import  MessagesPlaceholder
+#创建toolkits
+from langchain.sql_database import SQLDatabase
+from langchain.agents.agent_toolkits import AzureCognitiveServicesToolkit,SQLDatabaseToolkit
 from langchain.prompts import PromptTemplate,MessagesPlaceholder
 # serppai的token
 os.environ["SERPAPI_API_KEY"] = "95ac0e518f8e578cc81b149144efd7535d5d7ccab87244e946a1cf3bb14ef3e7"
@@ -62,6 +64,16 @@ class AgentsTemplate:
         print("\n============== Summary Chain Execution ==============")
         print("Input History: ", history)
         return self.summary_chain.run(history)
+
+    def createToolkits(self,toolKey):
+        toolkit = None
+        if toolKey == "azure":
+            toolkit = AzureCognitiveServicesToolkit()
+        elif toolKey == "sqlData":
+            db = SQLDatabase.from_uri("sqlite:///Chinook.db")
+            toolkit = SQLDatabaseToolkit(db = db,llm = self.llm)
+        return toolkit
+
     #零样本增强式生成ZERO_SHOT_REACT_DESCRIPTION,
     #使用chatModel的零样本增强式生成CHAT_ZERO_SHOT_REACT_DESCRIPTION,
     def zero_agent(self,question,agentType):
@@ -72,9 +84,12 @@ class AgentsTemplate:
         {chat_history}
         Question: {input}
         {agent_scratchpad}"""
+        #tookits使用
+        tookits = self.createToolkits("azure")
         # 动态构建初始化参数
         agent_params = {
-            "tools": self.tools,
+            #"tools": self.tools,
+            "toolkit": tookits,
             "llm": self.llm,
             "agent": agentType,
             "verbose": True,
